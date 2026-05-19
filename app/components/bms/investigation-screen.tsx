@@ -408,7 +408,7 @@ function InvestigationDetail({
       {/* Summary + Linkage */}
       <div className="grid gap-3 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
-          <PanelHead title="Case Summary" subtitle="Operational context and exception details" />
+          <PanelHead title="Case Summary" subtitle="Operational summary and investigation details" />
           <PanelBody className="space-y-3 text-xs text-slate-700">
             <p>{inv.summary}</p>
             <div className="rounded-md border border-slate-100 bg-slate-50/70 px-3 py-2">
@@ -423,7 +423,7 @@ function InvestigationDetail({
                 AI Recommendation
               </div>
               <p className="mt-1 text-slate-700">{inv.aiRecommendation}</p>
-              <p className="mt-2 text-[11px] text-slate-400 italic">AI-assisted operational insights.</p>
+              <p className="mt-2 text-[11px] text-slate-400">AI-assisted operational insights.</p>
             </div>
             {inv.resolutionNotes && (
               <div className="rounded-md border border-emerald-100 bg-emerald-50/40 px-3 py-2">
@@ -435,7 +435,7 @@ function InvestigationDetail({
         </Panel>
 
         <Panel>
-          <PanelHead title="Case Linkage" />
+          <PanelHead title="Case Reference" />
           <PanelBody className="space-y-3 text-xs">
             <div className="flex items-start justify-between gap-3">
               <span className="text-[11px] font-medium text-slate-500">Case ID</span>
@@ -504,7 +504,7 @@ function InvestigationDetail({
       {/* Timeline + Operational flags */}
       <div className="grid gap-3 lg:grid-cols-2">
         <Panel>
-          <PanelHead title="Investigation Timeline" subtitle="Operational workflow progression" />
+          <PanelHead title="Investigation Timeline" subtitle="Investigation and escalation workflow status" />
           <PanelBody>
             <ol className="relative border-l border-slate-200 pl-4">
               {timeline.map((step) => (
@@ -527,7 +527,7 @@ function InvestigationDetail({
         </Panel>
 
         <Panel>
-          <PanelHead title="Operational Flags" />
+          <PanelHead title="Operational Flags" subtitle="Current operational impact and escalation indicators" />
           <PanelBody className="space-y-2 text-xs">
             {[
               {
@@ -576,26 +576,26 @@ function InvestigationDetail({
 
       {/* Escalation workflow */}
       <Panel>
-        <PanelHead title="Escalation & Resolution Actions" subtitle="Operational orchestration options" />
+        <PanelHead title="Escalation & Resolution Actions" subtitle="Operational response actions" />
         <PanelBody className="grid gap-3 md:grid-cols-3">
           {[
             {
               label: "Escalate to Operations Lead",
-              desc: "Route this case to senior ops for immediate intervention.",
+              desc: "Route case for immediate operational review",
               action: "Escalate",
               style: "bg-rose-600 text-white hover:bg-rose-700",
               disabled: inv.status === "Resolved",
             },
             {
               label: "Request Ground Sweep",
-              desc: "Dispatch handheld scan sweep at last known location.",
+              desc: "Dispatch baggage search at last known location",
               action: "Dispatch",
               style: "bg-blue-600 text-white hover:bg-blue-700",
               disabled: inv.status === "Resolved",
             },
             {
               label: "Mark as Resolved",
-              desc: "Close investigation and trigger passenger notification.",
+              desc: "Close investigation and update passenger status",
               action: "Resolve",
               style: "bg-emerald-600 text-white hover:bg-emerald-700",
               disabled: inv.status === "Resolved",

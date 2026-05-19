@@ -384,7 +384,7 @@ export function BagDetailScreen({
                   AI Recommendation
                 </div>
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-700">{investigation.aiRecommendation}</p>
-                <p className="mt-2 text-[11px] italic text-slate-400">AI-assisted operational insights.</p>
+                <p className="mt-2 text-[11px] text-slate-400">AI-assisted operational insights.</p>
               </div>
             </div>
           </PanelBody>

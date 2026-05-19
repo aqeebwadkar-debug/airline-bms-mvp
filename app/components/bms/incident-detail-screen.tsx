@@ -62,7 +62,7 @@ export function IncidentDetailScreen({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
             <Radio className="size-3 animate-pulse" aria-hidden />
             Live Monitoring
           </span>
@@ -72,7 +72,7 @@ export function IncidentDetailScreen({
 
       <div className="grid gap-3 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
-          <PanelHead title="Case narrative" />
+          <PanelHead title="Case Narrative" />
           <PanelBody className="space-y-3 text-xs text-slate-700">
             <p>{inc.summary}</p>
             <div className="rounded-md border border-slate-100 bg-slate-50/70 px-3 py-2">
@@ -85,7 +85,7 @@ export function IncidentDetailScreen({
         </Panel>
 
         <Panel>
-          <PanelHead title="Linkage" />
+          <PanelHead title="Operational Reference" />
           <PanelBody className="space-y-3 text-xs">
             <div className="flex items-start justify-between gap-3">
               <span className="text-[11px] font-medium text-slate-500">Flight</span>
@@ -130,7 +130,7 @@ export function IncidentDetailScreen({
       {investigation && (
         <Panel>
           <PanelHead
-            title="Linked Investigation Case"
+            title="Linked Investigation"
             subtitle="This incident has an active investigation record in the resolution queue"
           />
           <PanelBody className="grid gap-3 sm:grid-cols-2 text-xs">
@@ -172,14 +172,14 @@ export function IncidentDetailScreen({
                 AI Recommendation
               </div>
               <p className="mt-1 text-[11px] leading-relaxed text-slate-700">{investigation.aiRecommendation}</p>
-              <p className="mt-2 text-[11px] italic text-slate-400">AI-assisted operational insights.</p>
+              <p className="mt-2 text-[11px]  text-slate-400">AI-assisted operational insights.</p>
             </div>
           </PanelBody>
         </Panel>
       )}
 
       <Panel>
-        <PanelHead title="Operational SLA checkpoints" />
+        <PanelHead title="Operational SLA Status" />
         <PanelBody className="grid gap-2 md:grid-cols-4 text-xs">
           {[
             ["Acknowledgement", inc.status !== "Open" ? "Complete" : "Due"],
