@@ -1,13 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import type { ReactNode } from "react";
-import { Cpu } from "lucide-react";
+import { Cpu, Radio } from "lucide-react";
 import {
   bagByLpn,
   flightByNo,
   incidentsForLpn,
+  investigationForLpn,
   scansForLpn,
 } from "./data";
+import { fmtTs, useLiveRefresh } from "./use-live-tick";
+import type { ScanEventRecord } from "./types";
 import {
   EmptyState,
   Mono,
@@ -23,6 +27,7 @@ interface Props {
   onBack: () => void;
   onOpenFlight: (flightNo: string) => void;
   onOpenIncident: (id: string) => void;
+  syncTick?: number;
 }
 
 const R753_LABELS = [
@@ -38,11 +43,39 @@ export function BagDetailScreen({
   onBack,
   onOpenFlight,
   onOpenIncident,
+  syncTick,
 }: Props) {
-  const bag = bagByLpn(lpn);
-  const flight = bag ? flightByNo(bag.flightNo) : undefined;
-  const scans = scansForLpn(lpn);
-  const incidents = incidentsForLpn(lpn);
+  const bag           = bagByLpn(lpn);
+  const flight        = bag ? flightByNo(bag.flightNo) : undefined;
+  const staticScans   = scansForLpn(lpn);
+  const incidents     = incidentsForLpn(lpn);
+  const investigation = investigationForLpn(lpn);
+
+  const [liveScans,   setLiveScans]   = useState<ScanEventRecord[]>(() => staticScans);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  function doRefresh() {
+    if (!bag) return;
+    if (Math.random() > 0.4) {
+      const SCAN_PTS = ["RFID Tunnel", "Sorter Primary", "Gate Reader", "ULD Loader", "Transfer Tunnel"] as const;
+      const now = new Date();
+      const newScan: ScanEventRecord = {
+        id:        `LIVE-${now.getTime()}`,
+        at:        fmtTs(now),
+        lpn:       bag.lpn,
+        flightNo:  bag.flightNo,
+        scanPoint: SCAN_PTS[Math.floor(Math.random() * SCAN_PTS.length)],
+        station:   bag.station,
+        deviceId:  `${bag.station}-RFID-TUN-01`,
+        scanType:  "RFID Fixed",
+        result:    Math.random() > 0.08 ? "Success" : "Retry Required",
+      };
+      setLiveScans((prev) => [newScan, ...prev]);
+    }
+    setLastRefresh(new Date());
+  }
+
+  useLiveRefresh(doRefresh, syncTick);
 
   if (!bag) {
     return (
@@ -61,26 +94,35 @@ export function BagDetailScreen({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          ← Back
-        </button>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-lg font-semibold text-slate-900">
-            <Mono>{bag.lpn}</Mono>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            ← Back
+          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-lg font-semibold text-slate-900">
+              <Mono>{bag.lpn}</Mono>
+            </span>
+            <StatusPill>{bag.status}</StatusPill>
+            <StatusPill>{bag.tagType}</StatusPill>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+            <Radio className="size-3 animate-pulse" aria-hidden />
+            Live Tracking
           </span>
-          <StatusPill>{bag.status}</StatusPill>
-          <StatusPill>{bag.tagType}</StatusPill>
+          <span className="text-[11px] text-slate-400">Updated {lastRefresh.toLocaleTimeString()}</span>
         </div>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
         <Panel>
-          <PanelHead title="Bag information" />
+          <PanelHead title="Bag Information" />
           <PanelBody className="space-y-3 text-xs">
             <Row k="Weight" v={`${bag.weightKg} kg`} />
             <Row k="Last scan" v={bag.lastScanAt} />
@@ -100,7 +142,7 @@ export function BagDetailScreen({
         </Panel>
 
         <Panel>
-          <PanelHead title="Flight association" />
+          <PanelHead title="Flight Association" />
           <PanelBody className="space-y-3 text-xs">
             <Row
               k="Operating flight"
@@ -129,7 +171,7 @@ export function BagDetailScreen({
 
       <div className="grid gap-3 xl:grid-cols-3">
         <Panel className="xl:col-span-2">
-          <PanelHead title="Baggage compliance workflow" subtitle="Operational verification checkpoints" />
+          <PanelHead title="Baggage Handling Workflow" subtitle="Operational verification and baggage movement checkpoints" />
           <PanelBody>
             <div className="grid gap-2 sm:grid-cols-5">
               {R753_LABELS.map((label, idx) => {
@@ -155,7 +197,7 @@ export function BagDetailScreen({
 
         <Panel>
           <PanelHead
-            title="AI insight"
+            title="Operational Insights"
             action={<Cpu className="size-4 text-slate-400" aria-hidden />}
           />
           <PanelBody className="text-xs text-slate-700">
@@ -164,7 +206,7 @@ export function BagDetailScreen({
               <span className="font-semibold">{bag.scanPoint}</span> for repeat exceptions.
             </p>
             <p className="mt-2 text-[11px] text-slate-500">
-              Advisory summary derived from bag status and scan cadence.
+              AI-assisted insights generated from baggage scan and operational monitoring patterns.
             </p>
           </PanelBody>
         </Panel>
@@ -172,10 +214,10 @@ export function BagDetailScreen({
 
       <div className="grid gap-3 lg:grid-cols-2">
         <Panel>
-          <PanelHead title="Scan timeline" />
+          <PanelHead title="Scan Timeline" subtitle="Recent baggage scan activity across checkpoints." />
           <PanelBody>
             <ol className="relative space-y-4 border-l border-slate-200 pl-4">
-              {scans.slice(-8).map((s) => (
+              {liveScans.slice(0, 8).map((s) => (
                 <li key={s.id} className="relative">
                   <span className="absolute -left-[21px] mt-0.5 size-2.5 rounded-full bg-blue-600 ring-4 ring-white" />
                   <div className="flex flex-wrap items-center gap-2">
@@ -193,7 +235,7 @@ export function BagDetailScreen({
         </Panel>
 
         <Panel>
-          <PanelHead title="Operational flags" />
+          <PanelHead title="Operational Flags" subtitle="Current baggage handling and routing status." />
           <PanelBody className="grid gap-2 text-xs text-slate-700">
             <FlagRow
               label="Reconciliation state"
@@ -228,8 +270,8 @@ export function BagDetailScreen({
       </div>
 
       <Panel>
-        <PanelHead title="Scan history" />
-        {scans.length === 0 ? (
+        <PanelHead title="Scan History" subtitle="Recorded baggage scans across devices and stations." />
+        {liveScans.length === 0 ? (
           <PanelBody>
             <EmptyState title="No scans recorded" />
           </PanelBody>
@@ -247,7 +289,7 @@ export function BagDetailScreen({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {[...scans].reverse().map((s) => (
+                {liveScans.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50">
                     <td className="px-3 py-2 text-[11px] text-slate-600">{s.at}</td>
                     <td className="px-3 py-2 text-slate-800">{s.scanPoint}</td>
@@ -270,7 +312,7 @@ export function BagDetailScreen({
       </Panel>
 
       <Panel>
-        <PanelHead title="Incident linkage" />
+        <PanelHead title="Linked Baggage Incidents" subtitle="Operational incidents linked to this baggage record." />
         <PanelBody>
           {incidents.length === 0 ? (
             <EmptyState title="No incident records linked to this LPN" />
@@ -300,11 +342,60 @@ export function BagDetailScreen({
         </PanelBody>
       </Panel>
 
+      {investigation && (
+        <Panel>
+          <PanelHead
+            title="Linked Investigation Case"
+            subtitle="Active investigation record associated with this bag"
+          />
+          <PanelBody className="space-y-3 text-xs">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-[11px] font-medium text-slate-500">Case ID</span>
+                  <span className="font-mono text-[11px] font-semibold text-slate-900">{investigation.id}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-[11px] font-medium text-slate-500">Type</span>
+                  <span className="text-[11px] text-slate-700">{investigation.caseType}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-[11px] font-medium text-slate-500">Status</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${
+                    investigation.status === "Resolved" ? "bg-emerald-50 text-emerald-800 ring-emerald-100" :
+                    investigation.status === "Escalated" || investigation.status === "SLA Breach" ? "bg-rose-50 text-rose-800 ring-rose-100" :
+                    "bg-blue-50 text-blue-800 ring-blue-100"
+                  }`}>{investigation.status}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-[11px] font-medium text-slate-500">SLA</span>
+                  <span className={`text-[11px] font-semibold ${investigation.slaBreach ? "text-rose-700" : "text-emerald-700"}`}>
+                    {investigation.slaBreach ? "Breach" : "OK"}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-[11px] font-medium text-slate-500">Last known</span>
+                  <span className="text-[11px] text-slate-700">{investigation.lastKnownLocation}</span>
+                </div>
+              </div>
+              <div className="rounded-md border border-blue-100 bg-blue-50/40 px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                  <Cpu className="size-3.5" aria-hidden />
+                  AI Recommendation
+                </div>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-700">{investigation.aiRecommendation}</p>
+                <p className="mt-2 text-[11px] italic text-slate-400">AI-assisted operational insights.</p>
+              </div>
+            </div>
+          </PanelBody>
+        </Panel>
+      )}
+
       <Panel>
-        <PanelHead title="Last scan visualization" />
+        <PanelHead title="Latest Scan Status" subtitle="Most recent baggage scan and telemetry status." />
         <PanelBody className="flex flex-wrap items-center gap-4">
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-            <SectionLabel>Telemetry ping</SectionLabel>
+            <SectionLabel>Latest Scan Event</SectionLabel>
             <p className="mt-2 text-sm font-semibold text-slate-900">{bag.scanPoint}</p>
             <p className="mt-1 text-[11px] text-slate-600">{bag.lastScanAt}</p>
           </div>

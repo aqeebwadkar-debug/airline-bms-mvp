@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Plane,
@@ -12,7 +11,9 @@ import {
   Bot,
   BarChart3,
   Bell,
+  RefreshCw,
   Search,
+  FileSearch,
 } from "lucide-react";
 import { AiAssistantScreen } from "./components/bms/ai-assistant-screen";
 import { AnalyticsScreen } from "./components/bms/analytics-screen";
@@ -30,6 +31,7 @@ import { FlightsScreen } from "./components/bms/flights-screen";
 import { IncidentDetailScreen } from "./components/bms/incident-detail-screen";
 import { IncidentReportScreen } from "./components/bms/incident-report-screen";
 import { IncidentsScreen } from "./components/bms/incidents-screen";
+import { InvestigationScreen } from "./components/bms/investigation-screen";
 import { ScansScreen } from "./components/bms/scans-screen";
 
 type PrimaryNav =
@@ -38,6 +40,7 @@ type PrimaryNav =
   | "bags"
   | "scans"
   | "incidents"
+  | "investigation"
   | "ai"
   | "analytics";
 
@@ -57,11 +60,42 @@ export default function Page() {
     }
   }, [router]);
 
-  const [primary, setPrimary] = useState<PrimaryNav>("dashboard");
+  const [primary, setPrimary] = useState<PrimaryNav>(() => {
+    try {
+      const saved = localStorage.getItem("bms_primary_nav");
+      if (saved && (["dashboard","flights","bags","scans","incidents","investigation","ai","analytics"] as string[]).includes(saved)) {
+        return saved as PrimaryNav;
+      }
+    } catch {}
+    return "dashboard";
+  });
   const [stack, setStack] = useState<Overlay[]>([]);
   const [globalQuery, setGlobalQuery] = useState("");
   const [searchActive, setSearchActive] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [syncTick, setSyncTick] = useState(0);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Close notifications on outside click
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    function handler(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [notificationsOpen]);
+
+  // Close notifications on ESC
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape") setNotificationsOpen(false);
+    }
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   const NOTIFICATIONS = [
     {
@@ -93,6 +127,12 @@ export default function Page() {
       title: "Flight BA114 shows loading variance",
       subtitle: "Manual recount recommended prior departure.",
       target: { kind: "flight" as const, flightNo: "BA114" },
+    },
+    {
+      id: "notif-6",
+      title: "QR617 SLA breach — DOH transfer dwell +4h",
+      subtitle: "Investigation INV-10045 escalated.",
+      target: { kind: "incident" as const, incidentId: "INC-240971" },
     },
   ];
 
@@ -152,6 +192,8 @@ export default function Page() {
   function navigatePrimary(next: PrimaryNav) {
     setPrimary(next);
     setStack([]);
+    setNotificationsOpen(false);
+    try { localStorage.setItem("bms_primary_nav", next); } catch {}
   }
 
   function pushOverlay(entry: Overlay) {
@@ -191,19 +233,35 @@ export default function Page() {
       case "flights":
         return "Flights";
       case "bags":
-        return "Bag tracking";
+        return "Bag Tracking";
       case "scans":
-        return "Scan events";
+        return "Scan Events";
       case "incidents":
         return "Incidents";
+      case "investigation":
+        return "Baggage Investigation & Resolution";
       case "ai":
-        return "Operations assistant";
+        return "Baggage Assistant";
       case "analytics":
         return "Analytics";
       default:
         return "Workspace";
     }
   }, [primary, top]);
+
+  const headerSubtitle = !top ? (() => {
+    switch (primary) {
+      case "dashboard":     return "Centralized visibility across baggage handling, flight activity, and incident monitoring.";
+      case "flights":       return "Monitor active baggage handling workflows across scheduled flights.";
+      case "bags":          return "Track baggage movement, scan activity, and operational exceptions.";
+      case "scans":         return "Live baggage scan activity across operational scan checkpoints.";
+      case "incidents":     return "Track baggage incidents, escalations, and operational disruptions.";
+      case "investigation": return "Track and resolve baggage exceptions — lost bags, missing scans, transfer risk, and SLA breaches.";
+      case "ai":            return "Intelligent operations assistant for baggage tracking, flight operations, and incident analysis.";
+      case "analytics":     return "Network-wide baggage throughput, reconciliation trends, scan compliance, and transfer-risk insights.";
+      default:              return "";
+    }
+  })() : "";
 
   const body = (() => {
     if (top?.kind === "incident-report") {
@@ -221,6 +279,7 @@ export default function Page() {
           onBack={popOverlay}
           onOpenBag={(lpn) => pushOverlay({ kind: "bag", lpn })}
           onOpenFlight={(flightNo) => pushOverlay({ kind: "flight", flightNo })}
+          syncTick={syncTick}
         />
       );
     }
@@ -233,6 +292,7 @@ export default function Page() {
           onOpenIncident={(incidentId) =>
             pushOverlay({ kind: "incident", incidentId })
           }
+          syncTick={syncTick}
         />
       );
     }
@@ -242,6 +302,7 @@ export default function Page() {
           flightNo={top.flightNo}
           onBack={popOverlay}
           onOpenBag={(lpn) => pushOverlay({ kind: "bag", lpn })}
+          syncTick={syncTick}
         />
       );
     }
@@ -255,21 +316,30 @@ export default function Page() {
             onOpenIncident={(incidentId) =>
               pushOverlay({ kind: "incident", incidentId })
             }
+            syncTick={syncTick}
           />
         );
       case "flights":
         return (
           <FlightsScreen
             onOpenFlight={(flightNo) => pushOverlay({ kind: "flight", flightNo })}
+            syncTick={syncTick}
           />
         );
       case "bags":
         return (
-          <BagsScreen onOpenBag={(lpn) => pushOverlay({ kind: "bag", lpn })} />
+          <BagsScreen
+            onOpenBag={(lpn) => pushOverlay({ kind: "bag", lpn })}
+            onOpenInvestigation={() => navigatePrimary("investigation")}
+            syncTick={syncTick}
+          />
         );
       case "scans":
         return (
-          <ScansScreen onOpenBag={(lpn) => pushOverlay({ kind: "bag", lpn })} />
+          <ScansScreen
+            onOpenBag={(lpn) => pushOverlay({ kind: "bag", lpn })}
+            syncTick={syncTick}
+          />
         );
       case "incidents":
         return (
@@ -279,19 +349,35 @@ export default function Page() {
             }
             onOpenBag={(lpn) => pushOverlay({ kind: "bag", lpn })}
             onReport={() => pushOverlay({ kind: "incident-report" })}
+            onOpenInvestigation={() => navigatePrimary("investigation")}
+            syncTick={syncTick}
+          />
+        );
+      case "investigation":
+        return (
+          <InvestigationScreen
+            onOpenBag={(lpn) => pushOverlay({ kind: "bag", lpn })}
+            onOpenFlight={(flightNo) => pushOverlay({ kind: "flight", flightNo })}
+            onOpenIncident={(incidentId) => pushOverlay({ kind: "incident", incidentId })}
+            syncTick={syncTick}
           />
         );
       case "ai":
-        return <AiAssistantScreen />;
+        return (
+          <AiAssistantScreen
+            onNavigate={(target) => navigatePrimary(target as PrimaryNav)}
+            syncTick={syncTick}
+          />
+        );
       case "analytics":
-        return <AnalyticsScreen />;
+        return <AnalyticsScreen syncTick={syncTick} />;
       default:
         return null;
     }
   })();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-100 text-slate-900 lg:flex-row">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-100 text-slate-900 lg:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-slate-800 bg-slate-950 text-slate-200 sm:w-60 sm:border-b-0 sm:border-r lg:w-64">
         <div className="flex items-center gap-3 border-b border-slate-800 px-4 py-4">
           <div className="flex size-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
@@ -325,13 +411,13 @@ export default function Page() {
           />
           <SidebarButton
             icon={Briefcase}
-            label="Bag tracking"
+            label="Bag Tracking"
             active={primary === "bags"}
             onClick={() => navigatePrimary("bags")}
           />
           <SidebarButton
             icon={ScanLine}
-            label="Scan events"
+            label="Scan Events"
             active={primary === "scans"}
             onClick={() => navigatePrimary("scans")}
           />
@@ -344,6 +430,12 @@ export default function Page() {
             label="Incidents"
             active={primary === "incidents"}
             onClick={() => navigatePrimary("incidents")}
+          />
+          <SidebarButton
+            icon={FileSearch}
+            label="Investigation"
+            active={primary === "investigation"}
+            onClick={() => navigatePrimary("investigation")}
           />
           <SidebarButton
             icon={Bot}
@@ -376,12 +468,15 @@ export default function Page() {
         </div>
       </aside>
 
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 lg:px-6">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-2 lg:px-6">
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold text-slate-900 lg:text-base">
               {headerTitle}
             </h1>
+            {headerSubtitle ? (
+              <p className="mt-0.5 text-[11px] text-slate-500">{headerSubtitle}</p>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2">
@@ -423,12 +518,13 @@ export default function Page() {
                 </div>
               ) : null}
             </div>
-            <div className="relative">
+            <div className="relative" ref={notifRef}>
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((open) => !open)}
                 className="relative flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 aria-label="Notifications"
+                title="Notifications"
               >
                 <Bell className="size-4" />
                 <span className="absolute right-2 top-2 size-2 rounded-full bg-rose-500 ring-2 ring-white" />
@@ -459,12 +555,22 @@ export default function Page() {
             </div>
             <button
               type="button"
+              onClick={() => setSyncTick((t) => t + 1)}
+              className="flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              aria-label="Sync live feed"
+              title="Sync live feed"
+            >
+              <RefreshCw className="size-4" />
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 localStorage.removeItem("isLoggedIn");
                 router.push("/login");
               }}
               className="flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              aria-label="Logout"
+              aria-label="Sign out"
+              title="Sign out"
             >
               <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -473,7 +579,7 @@ export default function Page() {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 lg:px-6 lg:py-5">
           {body}
         </div>
       </main>

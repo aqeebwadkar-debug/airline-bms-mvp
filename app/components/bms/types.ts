@@ -29,6 +29,22 @@ export type IncidentStatus =
 
 export type Severity = "Low" | "Medium" | "High" | "Critical";
 
+export type InvestigationStatus =
+  | "Active"
+  | "Under Resolution"
+  | "Resolved"
+  | "Escalated"
+  | "SLA Breach";
+
+export type InvestigationCaseType =
+  | "Missing Scan"
+  | "Lost in Transit"
+  | "Under Investigation"
+  | "Escalated"
+  | "Resolved & Delivered"
+  | "Investigation Required"
+  | "SLA Breach";
+
 export interface FlightRecord {
   flightNo: string;
   airline: string;
@@ -74,8 +90,8 @@ export interface ScanEventRecord {
   scanPoint: string;
   station: string;
   deviceId: string;
-  scanType: "RFID Fixed" | "RFID Handheld" | "Barcode" | "ULD";
-  result: "Success" | "No-read" | "Exception";
+  scanType: "RFID Fixed" | "RFID Handheld" | "Barcode" | "ULD" | "RFID Tunnel" | "Gate Reader" | "Sortation Camera";
+  result: "Success" | "No-read" | "Exception" | "Retry Required" | "Partial Read" | "Telemetry Gap" | "Missing Arrival Scan" | "Delayed Read";
 }
 
 export interface IncidentRecord {
@@ -90,6 +106,26 @@ export interface IncidentRecord {
   reportedAt: string;
   summary: string;
   rootCauseHint: string;
+}
+
+export interface InvestigationRecord {
+  id: string;
+  caseType: InvestigationCaseType;
+  status: InvestigationStatus;
+  severity: Severity;
+  lpn: string | null;
+  flightNo: string;
+  station: string;
+  passenger: string | null;
+  assignedTeam: string;
+  reportedAt: string;
+  lastUpdated: string;
+  summary: string;
+  lastKnownLocation: string;
+  aiRecommendation: string;
+  slaBreach: boolean;
+  incidentRef?: string;
+  resolutionNotes?: string;
 }
 
 export interface StationLoad {

@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Cpu } from "lucide-react";
+import { Cpu, Radio } from "lucide-react";
 import { bagsForFlight, flightByNo, MOCK_SCANS } from "./data";
+import { nudge, fmtTs, useLiveRefresh } from "./use-live-tick";
 import {
   EmptyState,
   Mono,
@@ -12,7 +13,7 @@ import {
   SectionLabel,
   StatusPill,
 } from "./primitives";
-import type { BagRecord } from "./types";
+import type { BagRecord, ScanEventRecord } from "./types";
 
 type Tab = "manifest" | "reconcile" | "short";
 
@@ -20,23 +21,32 @@ interface Props {
   flightNo: string;
   onBack: () => void;
   onOpenBag: (lpn: string) => void;
+  syncTick?: number;
 }
 
 export function FlightDetailScreen({
   flightNo,
   onBack,
   onOpenBag,
+  syncTick,
 }: Props) {
   const [tab, setTab] = useState<Tab>("manifest");
 
   const flight = flightByNo(flightNo);
-  const bags = useMemo(() => bagsForFlight(flightNo), [flightNo]);
-  const loadPct =
-    flight && flight.bagsPlanned > 0
-      ? Math.round((flight.bagsLoaded / flight.bagsPlanned) * 100)
-      : 0;
+  const bags   = useMemo(() => bagsForFlight(flightNo), [flightNo]);
 
-  const recentScans = useMemo(
+  const baseRecon = flight?.reconciliationPct ?? 0;
+  const baseLoaded = flight?.bagsLoaded ?? 0;
+
+  // Live operational metrics
+  const [liveRecon,    setLiveRecon]    = useState(baseRecon);
+  const [liveLoaded,   setLiveLoaded]   = useState(baseLoaded);
+  const [liveTransfer, setLiveTransfer] = useState(
+    () => bags.filter((b) => b.status === "Transfer Risk").length,
+  );
+  const [lastRefresh, setLastRefresh]  = useState(new Date());
+
+  const baseRecentScans = useMemo(
     () =>
       [...MOCK_SCANS]
         .filter((s) => s.flightNo === flightNo)
@@ -44,6 +54,37 @@ export function FlightDetailScreen({
         .slice(0, 8),
     [flightNo],
   );
+
+  const [recentScans, setRecentScans] = useState<ScanEventRecord[]>(() => baseRecentScans);
+
+  function doRefresh() {
+    if (!flight) return;
+    setLiveRecon((v) => Math.min(100, Math.max(0, nudge(v, 0.4))));
+    setLiveLoaded((v) => Math.min(flight.bagsPlanned, Math.max(0, v + (Math.random() > 0.75 ? 1 : 0))));
+    setLiveTransfer((v) => Math.max(0, v + (Math.random() > 0.8 ? (Math.random() > 0.5 ? 1 : -1) : 0)));
+
+    if (Math.random() > 0.45) {
+      const base = MOCK_SCANS.find((s) => s.flightNo === flightNo);
+      if (base) {
+        const now = new Date();
+        const liveScan: ScanEventRecord = {
+          ...base,
+          id:     `LIVE-${now.getTime()}`,
+          at:     fmtTs(now),
+          result: Math.random() > 0.1 ? "Success" : "Retry Required",
+        };
+        setRecentScans((prev) => [liveScan, ...prev].slice(0, 8));
+      }
+    }
+    setLastRefresh(new Date());
+  }
+
+  useLiveRefresh(doRefresh, syncTick);
+
+  const loadPct =
+    flight && flight.bagsPlanned > 0
+      ? Math.round((liveLoaded / flight.bagsPlanned) * 100)
+      : 0;
 
   if (!flight) {
     return (
@@ -87,6 +128,13 @@ export function FlightDetailScreen({
           </div>
           <p className="text-xs text-slate-500">{flight.airline}</p>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+            <Radio className="size-3 animate-pulse" aria-hidden />
+            Live
+          </span>
+          <span className="text-[11px] text-slate-400">Updated {lastRefresh.toLocaleTimeString()}</span>
+        </div>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-4">
@@ -106,21 +154,21 @@ export function FlightDetailScreen({
         <MiniMetric label="Passengers" value={String(flight.pax)} />
         <MiniMetric
           label="Bags loaded"
-          value={`${flight.bagsLoaded}/${flight.bagsPlanned}`}
+          value={`${liveLoaded}/${flight.bagsPlanned}`}
         />
         <MiniMetric
           label="Reconciliation"
-          value={`${flight.reconciliationPct.toFixed(1)}%`}
+          value={`${liveRecon.toFixed(1)}%`}
         />
-        <MiniMetric label="Transfer-risk bags" value={String(transferRisk.length)} />
+        <MiniMetric label="Transfer Risk Bags" value={String(liveTransfer)} />
         <MiniMetric label="Loading progress" value={`${loadPct}%`} />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-3">
         <Panel className="xl:col-span-2">
           <PanelHead
-            title="Baggage workspace"
-            subtitle="Manifest, reconciliation exceptions, and short-shipped drill-down"
+            title="Baggage Operations"
+            subtitle="Manifest, reconciliation status, and short-shipped baggage monitoring"
             action={
               <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
                 {(
@@ -163,7 +211,13 @@ export function FlightDetailScreen({
                   {bags.map((b: BagRecord) => (
                     <tr
                       key={b.lpn}
-                      className="cursor-pointer hover:bg-slate-50"
+                      className={`cursor-pointer hover:bg-slate-50 ${
+                        b.status === "Transfer Risk" || b.status === "Held Security"
+                          ? "bg-rose-50/30"
+                          : b.status === "Delayed" || b.status === "Short-shipped"
+                            ? "bg-amber-50/20"
+                            : ""
+                      }`}
                       onClick={() => onOpenBag(b.lpn)}
                     >
                       <td className="px-3 py-2">
@@ -268,7 +322,7 @@ export function FlightDetailScreen({
 
         <div className="space-y-3">
           <Panel>
-            <PanelHead title="Transfer risk" subtitle="Derived from operational thresholds" />
+            <PanelHead title="Transfer Risk" subtitle="Derived from baggage transfer thresholds" />
             <PanelBody className="space-y-2">
               {transferRisk.length === 0 ? (
                 <p className="text-xs text-slate-600">No bags flagged.</p>
@@ -289,7 +343,7 @@ export function FlightDetailScreen({
           </Panel>
 
           <Panel>
-            <PanelHead title="Delayed bags (manifest)" />
+            <PanelHead title="Delayed Bags" />
             <PanelBody className="space-y-2">
               {delayed.length === 0 ? (
                 <p className="text-xs text-slate-600">None on this flight slice.</p>
@@ -311,7 +365,7 @@ export function FlightDetailScreen({
 
           <Panel>
             <PanelHead
-              title="AI operational insight"
+              title="Operational Insight"
               action={<Cpu className="size-4 text-slate-400" aria-hidden />}
             />
             <PanelBody className="space-y-2 text-xs text-slate-700">
@@ -321,7 +375,7 @@ export function FlightDetailScreen({
                 exceeds <span className="font-mono">7m</span> during bank overlap.
               </p>
               <p className="text-[11px] text-slate-500">
-                Advisory only — summary based on flight metrics and scan history.
+                AI-assisted insights generated from live baggage events and operational monitoring patterns.
               </p>
             </PanelBody>
           </Panel>
@@ -330,7 +384,7 @@ export function FlightDetailScreen({
 
       <div className="grid gap-3 lg:grid-cols-2">
         <Panel>
-          <PanelHead title="Loading statistics" />
+          <PanelHead title="Loading Overview" subtitle="Container allocation, baggage mix, and loading distribution" />
           <PanelBody className="grid gap-3 sm:grid-cols-2">
             <div>
               <SectionLabel>Container positions</SectionLabel>
@@ -406,7 +460,7 @@ export function FlightDetailScreen({
         </Panel>
 
         <Panel>
-          <PanelHead title="Recent scan events (flight-linked)" />
+          <PanelHead title="Recent Flight Scan Events" subtitle="Latest baggage scan activity associated with this flight" />
           {recentScans.length === 0 ? (
             <PanelBody>
               <EmptyState title="No linked scans" />
@@ -449,7 +503,7 @@ export function FlightDetailScreen({
       </div>
 
       <Panel>
-        <PanelHead title="Passenger baggage summary" />
+        <PanelHead title="Passenger Baggage Summary" subtitle="Passenger-linked baggage metrics and screening overview" />
         <PanelBody className="grid gap-3 md:grid-cols-3">
           <div className="rounded-md border border-slate-100 bg-slate-50/60 p-3">
             <p className="text-[11px] font-semibold text-slate-500">PNR-linked bags</p>
@@ -471,7 +525,7 @@ export function FlightDetailScreen({
       </Panel>
 
       <Panel>
-        <PanelHead title="Operational timeline" />
+        <PanelHead title="Operational Timeline" subtitle="Chronological baggage handling and loading events" />
         <PanelBody>
           <ol className="relative border-l border-slate-200 pl-4">
             {[

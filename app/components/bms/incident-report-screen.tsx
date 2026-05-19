@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { MOCK_FLIGHTS } from "./data";
-import { Panel, PanelBody, PanelHead } from "./primitives";
+import { Panel, PanelBody, PanelHead, StatusPill } from "./primitives";
 
 interface Props {
   onCancel: () => void;
@@ -22,6 +23,7 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
   const [reportedBy, setReportedBy] = useState("");
   const [status, setStatus] = useState("Open");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitted, setSubmitted] = useState(false);
 
   function submit() {
     const next: Record<string, string> = {};
@@ -31,7 +33,34 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
     if (!notes.trim()) next.notes = "Operational notes are required.";
     setErrors(next);
     if (Object.keys(next).length > 0) return;
-    onSubmitted();
+    setSubmitted(true);
+    window.setTimeout(() => onSubmitted(), 2000);
+  }
+
+  if (submitted) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center space-y-4 py-12">
+        <CheckCircle2 className="size-12 text-emerald-500" />
+        <div className="text-center">
+          <p className="text-sm font-semibold text-slate-900">Incident created successfully</p>
+          <p className="mt-1 text-xs text-slate-500">Assigned to operations queue</p>
+        </div>
+        <div className="flex flex-col items-center gap-2 rounded-md border border-slate-100 bg-slate-50/80 px-6 py-3 text-xs text-slate-700">
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-emerald-500" />
+            Incident created and routed to operations queue
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-blue-500" />
+            Assigned for supervisor review
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+            Linked investigation workflow generating…
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -39,7 +68,7 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs text-slate-500">
-            Enterprise intake — lightweight client-side report workflow.
+            Create and route baggage operation incidents for review and escalation.
           </p>
         </div>
         <button
@@ -52,7 +81,7 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
       </div>
 
       <Panel>
-        <PanelHead title="Incident characteristics" />
+        <PanelHead title="Incident characteristics" subtitle="Complete all required fields for proper routing and escalation" />
         <PanelBody className="grid gap-4 md:grid-cols-2">
           <Field label="Bag ID (LPN)" error={errors.lpn}>
             <input
@@ -81,17 +110,8 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
               onChange={(e) => setType(e.target.value)}
               className="h-9 w-full rounded-md border border-slate-200 px-2 text-xs outline-none ring-blue-500/30 focus:ring-2"
             >
-              {[
-                "Delayed Bag",
-                "Damaged Bag",
-                "Lost Bag",
-                "Security Hold",
-                "Short-shipped",
-                "Tag Error",
-              ].map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+              {["Delayed Bag", "Damaged Bag", "Lost Bag", "Missing Scan", "Security Hold", "Short-shipped", "Tag Error", "Transfer Risk"].map((t) => (
+                <option key={t} value={t}>{t}</option>
               ))}
             </select>
           </Field>
@@ -109,9 +129,7 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
               className="h-9 w-full rounded-md border border-slate-200 px-2 text-xs outline-none ring-blue-500/30 focus:ring-2"
             >
               {["Low", "Medium", "High", "Critical"].map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </Field>
@@ -122,9 +140,7 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
               className="h-9 w-full rounded-md border border-slate-200 px-2 text-xs outline-none ring-blue-500/30 focus:ring-2"
             >
               {["Open", "Investigating"].map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </Field>
@@ -148,7 +164,7 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
             <input
               value={reportedBy}
               onChange={(e) => setReportedBy(e.target.value)}
-              placeholder="Station ID / role"
+              placeholder="Station ID / role / badge number"
               className="h-9 w-full rounded-md border border-slate-200 px-2 text-xs outline-none ring-blue-500/30 focus:ring-2"
             />
           </Field>
@@ -158,7 +174,7 @@ export function IncidentReportScreen({ onCancel, onSubmitted }: Props) {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={4}
-                placeholder="Timeline, witnesses, equipment IDs…"
+                placeholder="Timeline, witnesses, equipment IDs, scan references…"
                 className="w-full rounded-md border border-slate-200 px-2 py-2 text-xs outline-none ring-blue-500/30 focus:ring-2"
               />
             </Field>
