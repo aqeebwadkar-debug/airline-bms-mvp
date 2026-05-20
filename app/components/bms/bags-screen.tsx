@@ -233,6 +233,7 @@ export function BagsScreen({ onOpenBag, onOpenInvestigation, syncTick }: Props) 
                     <th className="px-3 py-2">Station</th>
                     <th className="px-3 py-2">Risk</th>
                     <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Investigation</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -268,22 +269,22 @@ export function BagsScreen({ onOpenBag, onOpenInvestigation, syncTick }: Props) 
                         <StatusPill>{b.risk}</StatusPill>
                       </td>
                       <td className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <div className="min-w-[120px]">
-  <StatusPill>{b.status}</StatusPill>
-</div>
-                          {EXCEPTION_STATUSES.has(b.status) && onOpenInvestigation ? (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); onOpenInvestigation(); }}
-                              title="Open Investigation module"
-                              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-50"
-                            >
-                              <ExternalLink className="size-2.5" aria-hidden />
-                              Investigate
-                            </button>
-                          ) : null}
-                        </div>
+                        <StatusPill>{b.status}</StatusPill>
+                      </td>
+                      <td className="px-3 py-2">
+                        {EXCEPTION_STATUSES.has(b.status) && onOpenInvestigation ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onOpenInvestigation(); }}
+                            title="Open Investigation module"
+                            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-50"
+                          >
+                            <ExternalLink className="size-2.5" aria-hidden />
+                            Investigate
+                          </button>
+                        ) : (
+                          <span className="inline-flex cursor-default items-center rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-[10px] font-semibold text-slate-400">N/A</span>
+                        )}
                       </td>
                     </tr>
                   ))}

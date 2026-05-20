@@ -307,7 +307,7 @@ export function IncidentsScreen({
                         {i.reportedAt}
                       </td>
                       <td className="px-3 py-2">
-                        {INVESTIGATION_CATEGORIES.has(i.category) && (
+                        {INVESTIGATION_CATEGORIES.has(i.category) ? (
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); onOpenInvestigation?.(); }}
@@ -316,6 +316,8 @@ export function IncidentsScreen({
                             <ExternalLink className="size-3" aria-hidden />
                             Investigate
                           </button>
+                        ) : (
+                          <span className="inline-flex cursor-default items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-400">N/A</span>
                         )}
                       </td>
                     </tr>
