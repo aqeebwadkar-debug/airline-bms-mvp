@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, RotateCcw, Phone, Video } from "lucide-react";
+import { Send, ArrowLeft, MoreVertical, Paperclip, Camera, Mic, Smile } from "lucide-react";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type Role = "bot" | "user";
 
-interface TextMsg  { id: string; role: Role;   kind: "text";  text: string; ts: Date }
-interface CardMsg  { id: string; role: "bot";  kind: "card";  card: "track" | "case" | "deliv"; ts: Date }
-interface PillMsg  { id: string; role: "bot";  kind: "pill";  text: string; ts: Date }
+interface TextMsg { id: string; role: Role;   kind: "text"; text: string; ts: Date }
+interface CardMsg { id: string; role: "bot";  kind: "card"; card: "track" | "case" | "deliv"; ts: Date }
+interface PillMsg { id: string; role: "bot";  kind: "pill"; text: string; ts: Date }
 
 type Msg  = TextMsg | CardMsg | PillMsg;
 type Flow = "welcome" | "track_pnr" | "track_done" | "report_type" | "report_details" | "report_done" | "delivery" | "status" | "agent" | "free";
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Mock data ───────────────────────────────────────────────────────────────
 
 const JOURNEY = [
   { label: "Checked in at Mumbai Terminal 2", sub: "Counter 14 · 08:42 IST",         done: true,  active: false },
@@ -24,7 +24,7 @@ const JOURNEY = [
   { label: "Expected on Belt 6",              sub: "Dubai International T3",         done: false, active: false },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 let _uid = 0;
 function uid() { return `m${++_uid}`; }
@@ -37,28 +37,36 @@ const MENU_TEXT =
   "Hi! I'm the *SkyTrack* baggage assistant ✈️\n\nPlease reply with a number:\n\n1️⃣  Track my baggage\n2️⃣  Report missing baggage\n3️⃣  Check incident status\n4️⃣  Baggage delivery update\n5️⃣  Talk to an agent";
 
 function initMsgs(): Msg[] {
-  const now = new Date();
-  return [
-    { id: uid(), role: "bot", kind: "text", text: MENU_TEXT, ts: now },
-  ];
+  return [{ id: uid(), role: "bot", kind: "text", text: MENU_TEXT, ts: new Date() }];
 }
 
-// ─── WhatsApp-style bubbles ────────────────────────────────────────────────────
+// Renders *bold* inline within text while preserving whitespace-pre-line newlines
+function renderText(text: string): React.ReactNode {
+  const parts = text.split(/\*([^*]+)\*/g);
+  return parts.map((part, i) =>
+    i % 2 === 1
+      ? <strong key={i} className="font-semibold">{part}</strong>
+      : <span key={i}>{part}</span>
+  );
+}
+
+// ─── Bubbles ─────────────────────────────────────────────────────────────────
 
 function BotBubble({ text, ts }: { text: string; ts: Date }) {
   return (
-    <div className="flex justify-start px-3 py-0.5">
+    <div className="flex justify-start px-2 py-[2px]">
       <div
-        className="relative max-w-[78%] rounded-lg rounded-tl-none px-3 py-2 shadow-sm"
+        className="relative max-w-[75%] rounded-[7px] rounded-tl-none px-[9px] py-[6px] shadow-sm"
         style={{ background: "#ffffff" }}
       >
-        {/* tail */}
         <div
-          className="absolute -left-2 top-0 h-0 w-0"
+          className="absolute -left-[7px] top-0 h-0 w-0"
           style={{ borderTop: "8px solid #ffffff", borderLeft: "8px solid transparent" }}
         />
-        <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-gray-800">{text}</p>
-        <p className="mt-0.5 text-right text-[10px] text-gray-400">{fmtTime(ts)}</p>
+        <p className="whitespace-pre-line text-[14px] leading-[1.4] text-[#111b21]">
+          {renderText(text)}
+        </p>
+        <p className="mt-[3px] text-right text-[11px] leading-none text-[#667781]">{fmtTime(ts)}</p>
       </div>
     </div>
   );
@@ -66,22 +74,24 @@ function BotBubble({ text, ts }: { text: string; ts: Date }) {
 
 function UserBubble({ text, ts }: { text: string; ts: Date }) {
   return (
-    <div className="flex justify-end px-3 py-0.5">
+    <div className="flex justify-end px-2 py-[2px]">
       <div
-        className="relative max-w-[78%] rounded-lg rounded-tr-none px-3 py-2 shadow-sm"
-        style={{ background: "#dcf8c6" }}
+        className="relative max-w-[75%] rounded-[7px] rounded-tr-none px-[9px] py-[6px] shadow-sm"
+        style={{ background: "#d9fdd3" }}
       >
-        {/* tail */}
         <div
-          className="absolute -right-2 top-0 h-0 w-0"
-          style={{ borderTop: "8px solid #dcf8c6", borderRight: "8px solid transparent" }}
+          className="absolute -right-[7px] top-0 h-0 w-0"
+          style={{ borderTop: "8px solid #d9fdd3", borderRight: "8px solid transparent" }}
         />
-        <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-gray-800">{text}</p>
-        <div className="mt-0.5 flex items-center justify-end gap-1">
-          <p className="text-[10px] text-gray-500">{fmtTime(ts)}</p>
-          <svg className="size-3 text-blue-500" viewBox="0 0 16 11" fill="currentColor">
-            <path d="M11.071.653a.75.75 0 0 1 .053 1.06l-6.5 7a.75.75 0 0 1-1.112 0l-3-3.25a.75.75 0 0 1 1.112-1.028L4.5 7.066l5.956-6.36a.75.75 0 0 1 1.06-.053z"/>
-            <path d="M14.571.653a.75.75 0 0 1 .053 1.06l-6.5 7a.75.75 0 0 1-1.059.022L8.5 7.066l.959-1.031.806.868 5.246-5.197a.75.75 0 0 1 1.06-.053z"/>
+        <p className="whitespace-pre-line text-[14px] leading-[1.4] text-[#111b21]">
+          {renderText(text)}
+        </p>
+        <div className="mt-[3px] flex items-center justify-end gap-[3px]">
+          <span className="text-[11px] leading-none text-[#667781]">{fmtTime(ts)}</span>
+          {/* Blue double-tick read receipt */}
+          <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
+            <path d="M11.071.653a.75.75 0 0 1 .053 1.06l-6.5 7a.75.75 0 0 1-1.112 0l-3-3.25a.75.75 0 0 1 1.112-1.028L4.5 7.066l5.956-6.36a.75.75 0 0 1 1.06-.053z" fill="#53bdeb"/>
+            <path d="M14.571.653a.75.75 0 0 1 .053 1.06l-6.5 7a.75.75 0 0 1-1.059.022L8.5 7.066l.959-1.031.806.868 5.246-5.197a.75.75 0 0 1 1.06-.053z" fill="#53bdeb"/>
           </svg>
         </div>
       </div>
@@ -91,16 +101,18 @@ function UserBubble({ text, ts }: { text: string; ts: Date }) {
 
 function TypingDots() {
   return (
-    <div className="flex justify-start px-3 py-0.5">
-      <div className="relative rounded-lg rounded-tl-none bg-white px-4 py-3 shadow-sm">
+    <div className="flex justify-start px-2 py-[2px]">
+      <div
+        className="relative rounded-[7px] rounded-tl-none bg-white px-4 py-3 shadow-sm"
+      >
         <div
-          className="absolute -left-2 top-0 h-0 w-0"
+          className="absolute -left-[7px] top-0 h-0 w-0"
           style={{ borderTop: "8px solid #ffffff", borderLeft: "8px solid transparent" }}
         />
-        <div className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.32s]" />
-          <span className="size-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.16s]" />
-          <span className="size-2 rounded-full bg-gray-400 animate-bounce" />
+        <div className="flex items-center gap-[5px]">
+          <span className="size-[7px] rounded-full bg-[#8696a0] animate-bounce [animation-delay:-0.32s]" />
+          <span className="size-[7px] rounded-full bg-[#8696a0] animate-bounce [animation-delay:-0.16s]" />
+          <span className="size-[7px] rounded-full bg-[#8696a0] animate-bounce" />
         </div>
       </div>
     </div>
@@ -110,7 +122,9 @@ function TypingDots() {
 function DatePill({ label }: { label: string }) {
   return (
     <div className="flex justify-center py-2">
-      <span className="rounded-full bg-[#d1d7db]/60 px-3 py-0.5 text-[11px] text-gray-600">{label}</span>
+      <span className="rounded-full bg-[#e9f0f7]/90 px-3 py-[3px] text-[12px] font-medium text-[#54656f] shadow-sm">
+        {label}
+      </span>
     </div>
   );
 }
@@ -119,8 +133,8 @@ function DatePill({ label }: { label: string }) {
 
 function TrackCard({ ts }: { ts: Date }) {
   return (
-    <div className="flex justify-start px-3 py-0.5">
-      <div className="w-[78%] overflow-hidden rounded-lg shadow-sm" style={{ background: "#ffffff" }}>
+    <div className="flex justify-start px-2 py-[2px]">
+      <div className="w-[75%] overflow-hidden rounded-[7px] rounded-tl-none shadow-sm" style={{ background: "#ffffff" }}>
         <div className="border-b border-gray-100 bg-[#128C7E] px-3 py-2">
           <p className="text-[10px] font-bold uppercase tracking-wide text-white/80">Baggage Status</p>
           <p className="text-[13px] font-bold text-white">LPN AI-0987654321</p>
@@ -160,7 +174,7 @@ function TrackCard({ ts }: { ts: Date }) {
             ⏱ ETA: 18 min · Belt 6 · Dubai T3
           </div>
         </div>
-        <p className="px-3 pb-2 text-right text-[10px] text-gray-400">{fmtTime(ts)}</p>
+        <p className="px-3 pb-2 text-right text-[11px] text-[#667781]">{fmtTime(ts)}</p>
       </div>
     </div>
   );
@@ -168,8 +182,8 @@ function TrackCard({ ts }: { ts: Date }) {
 
 function CaseCard({ ts }: { ts: Date }) {
   return (
-    <div className="flex justify-start px-3 py-0.5">
-      <div className="w-[78%] overflow-hidden rounded-lg bg-white shadow-sm">
+    <div className="flex justify-start px-2 py-[2px]">
+      <div className="w-[75%] overflow-hidden rounded-[7px] rounded-tl-none bg-white shadow-sm">
         <div className="border-b border-gray-100 bg-[#128C7E] px-3 py-2">
           <p className="text-[10px] font-bold uppercase tracking-wide text-white/80">Case Opened</p>
           <p className="text-[13px] font-bold text-white">BG-20451</p>
@@ -183,7 +197,7 @@ function CaseCard({ ts }: { ts: Date }) {
         <div className="mx-3 mb-2 rounded bg-gray-50 px-2 py-1 text-[10.5px] text-gray-500">
           Confirmation sent to your registered email · Ref: BG-20451
         </div>
-        <p className="px-3 pb-2 text-right text-[10px] text-gray-400">{fmtTime(ts)}</p>
+        <p className="px-3 pb-2 text-right text-[11px] text-[#667781]">{fmtTime(ts)}</p>
       </div>
     </div>
   );
@@ -191,8 +205,8 @@ function CaseCard({ ts }: { ts: Date }) {
 
 function DelivCard({ ts }: { ts: Date }) {
   return (
-    <div className="flex justify-start px-3 py-0.5">
-      <div className="w-[78%] overflow-hidden rounded-lg bg-white shadow-sm">
+    <div className="flex justify-start px-2 py-[2px]">
+      <div className="w-[75%] overflow-hidden rounded-[7px] rounded-tl-none bg-white shadow-sm">
         <div className="border-b border-gray-100 bg-[#128C7E] px-3 py-2">
           <p className="text-[10px] font-bold uppercase tracking-wide text-white/80">Delivery Status</p>
           <p className="text-[13px] font-bold text-white">BlueDart Express</p>
@@ -203,13 +217,13 @@ function DelivCard({ ts }: { ts: Date }) {
           <div className="flex justify-between"><span className="text-gray-500">ETA</span><span className="font-semibold text-[#25D366]">Today before 7:00 PM</span></div>
           <div className="flex justify-between"><span className="text-gray-500">Deliver to</span><span className="font-medium text-gray-700">Villa 42, Jumeirah Lakes</span></div>
         </div>
-        <p className="px-3 pb-2 text-right text-[10px] text-gray-400">{fmtTime(ts)}</p>
+        <p className="px-3 pb-2 text-right text-[11px] text-[#667781]">{fmtTime(ts)}</p>
       </div>
     </div>
   );
 }
 
-// ─── Chat ─────────────────────────────────────────────────────────────────────
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PassengerChatbotPage() {
   const [msgs, setMsgs]     = useState<Msg[]>(initMsgs);
@@ -218,6 +232,19 @@ export default function PassengerChatbotPage() {
   const [input, setInput]   = useState("");
   const sessionRef          = useRef(0);
   const bottomRef           = useRef<HTMLDivElement>(null);
+  const textareaRef         = useRef<HTMLTextAreaElement>(null);
+
+  // Lock body scroll so only the message area scrolls
+  useEffect(() => {
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+    };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -251,14 +278,18 @@ export default function PassengerChatbotPage() {
     setInput("");
   }
 
+  function resetTextareaHeight() {
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+  }
+
   function sendText() {
     const text = input.trim();
     if (!text) return;
     setInput("");
+    resetTextareaHeight();
     const now = new Date();
     push({ id: uid(), role: "user", kind: "text", text, ts: now });
 
-    // Number-based menu from welcome
     if (flow === "welcome") {
       const n = text.trim();
       if (n === "1") {
@@ -301,7 +332,6 @@ export default function PassengerChatbotPage() {
       return;
     }
 
-    // Sub-menu for report type
     if (flow === "report_type") {
       const issues: Record<string, string> = { "1": "Bag not arrived", "2": "Damaged baggage", "3": "Wrong bag collected", "4": "Missing item from bag" };
       const issue = issues[text.trim()];
@@ -359,7 +389,6 @@ export default function PassengerChatbotPage() {
       return;
     }
 
-    // Free / agent mode
     if (text.toLowerCase() === "menu" || text === "0") {
       setFlow("welcome");
       botAfter(600, () => push({ id: uid(), role: "bot", kind: "text", text: MENU_TEXT, ts: new Date() }));
@@ -379,44 +408,55 @@ export default function PassengerChatbotPage() {
     botAfter(900, () => push({ id: uid(), role: "bot", kind: "text", text: reply, ts: new Date() }));
   }
 
+  const hasInput = input.trim().length > 0;
+
   return (
+    /*
+     * position: fixed; inset: 0 is the most reliable cross-platform approach.
+     * On Android Chrome, when the keyboard opens the viewport shrinks — fixed
+     * elements automatically adapt, keeping the input above the keyboard and
+     * preventing the black-gap / layout-jump issues caused by 100vh.
+     */
     <div
-      className="flex h-screen flex-col"
-      style={{ background: "#ECE5DD", maxHeight: "100dvh" }}
+      className="flex flex-col"
+      style={{ position: "fixed", inset: 0, background: "#efeae2", overflow: "hidden" }}
     >
-      {/* WhatsApp Business header */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div
-        className="flex shrink-0 items-center gap-3 px-3 py-2 shadow-md"
-        style={{ background: "#128C7E" }}
+        className="flex shrink-0 items-center gap-2 px-2 shadow-md"
+        style={{ background: "#128C7E", paddingTop: "10px", paddingBottom: "10px" }}
       >
-        {/* Avatar */}
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-[15px] font-bold text-white">
+        <button className="shrink-0 p-1 text-white active:opacity-70">
+          <ArrowLeft className="size-[22px]" />
+        </button>
+
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-[15px] select-none">
           ✈️
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1">
-            <p className="text-[14px] font-semibold text-white leading-tight">SkyTrack Baggage Support</p>
-            {/* verified badge */}
-            <svg className="size-4 shrink-0 text-[#25D366]" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-[5px]">
+            <span className="truncate text-[15px] font-semibold leading-tight text-white">
+              SkyTrack Baggage Support
+            </span>
+            {/* WhatsApp-style verified badge */}
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+              <circle cx="7" cy="7" r="7" fill="#4fc3f7" />
+              <path d="M3.5 7l2.5 2.5 4.5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <p className="text-[11px] text-white/75 leading-tight">Business Account · Typically replies instantly</p>
+          <span className="text-[11.5px] leading-tight text-white/70">Business Account</span>
         </div>
 
-        <div className="flex items-center gap-3 text-white/80">
-          <Phone className="size-5" />
-          <Video className="size-5" />
-          <button onClick={reset} title="New conversation">
-            <RotateCcw className="size-4" />
-          </button>
-        </div>
+        {/* 3-dot menu — tapping resets the conversation */}
+        <button onClick={reset} className="shrink-0 p-1 text-white/80 active:opacity-70" title="New conversation">
+          <MoreVertical className="size-5" />
+        </button>
       </div>
 
-      {/* Message area */}
+      {/* ── Message area ─────────────────────────────────────────────────── */}
       <div
-        className="flex-1 overflow-y-auto py-2"
+        className="flex-1 overflow-y-auto overscroll-contain py-2"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23b0a99f' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }}
@@ -438,7 +478,9 @@ export default function PassengerChatbotPage() {
           if (msg.kind === "pill")
             return (
               <div key={msg.id} className="flex justify-center py-1">
-                <span className="rounded-full bg-[#d1d7db]/70 px-3 py-0.5 text-[11px] text-gray-600">{msg.text}</span>
+                <span className="rounded-full bg-[#e9f0f7]/90 px-3 py-[3px] text-[12px] font-medium text-[#54656f] shadow-sm">
+                  {msg.text}
+                </span>
               </div>
             );
 
@@ -446,16 +488,25 @@ export default function PassengerChatbotPage() {
         })}
 
         {typing && <TypingDots />}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className="h-2" />
       </div>
 
-      {/* Input bar */}
+      {/* ── Input bar ────────────────────────────────────────────────────── */}
       <div
         className="flex shrink-0 items-end gap-2 px-2 py-2"
-        style={{ background: "#F0F0F0" }}
+        style={{
+          background: "#f0f2f5",
+          paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))",
+        }}
       >
-        <div className="flex flex-1 items-end rounded-3xl bg-white px-4 py-2.5 shadow-sm">
+        {/* White pill: emoji · textarea · paperclip · camera */}
+        <div className="flex flex-1 items-end gap-2 rounded-[24px] bg-white px-3 py-[9px] shadow-sm">
+          <button className="shrink-0 self-end pb-[2px] text-[#8696a0] active:opacity-60">
+            <Smile className="size-[22px]" />
+          </button>
+
           <textarea
+            ref={textareaRef}
             rows={1}
             value={input}
             onChange={(e) => {
@@ -467,21 +518,31 @@ export default function PassengerChatbotPage() {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 sendText();
-                (e.target as HTMLTextAreaElement).style.height = "auto";
               }
             }}
             placeholder="Type a message"
-            className="w-full resize-none bg-transparent text-[14px] leading-relaxed text-gray-800 outline-none placeholder:text-gray-400"
+            className="flex-1 resize-none bg-transparent text-[15px] leading-relaxed text-[#111b21] outline-none placeholder:text-[#8696a0]"
             style={{ maxHeight: 120 }}
           />
+
+          <button className="shrink-0 self-end pb-[2px] text-[#8696a0] active:opacity-60">
+            <Paperclip className="size-[20px]" />
+          </button>
+          <button className="shrink-0 self-end pb-[2px] text-[#8696a0] active:opacity-60">
+            <Camera className="size-[20px]" />
+          </button>
         </div>
+
+        {/* Send / Mic button */}
         <button
-          onClick={sendText}
-          disabled={!input.trim()}
-          className="flex size-11 shrink-0 items-center justify-center rounded-full text-white shadow-md disabled:opacity-50"
-          style={{ background: input.trim() ? "#128C7E" : "#128C7E" }}
+          onClick={hasInput ? sendText : undefined}
+          className="flex size-[46px] shrink-0 items-center justify-center rounded-full text-white shadow-sm active:opacity-80"
+          style={{ background: "#00a884" }}
         >
-          <Send className="size-5" />
+          {hasInput
+            ? <Send className="size-[20px] translate-x-[1px]" />
+            : <Mic className="size-[20px]" />
+          }
         </button>
       </div>
     </div>
