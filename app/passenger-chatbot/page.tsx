@@ -86,12 +86,38 @@ function UserBubble({ text, ts }: { text: string; ts: Date }) {
         <p className="whitespace-pre-line text-[14px] leading-[1.4] text-[#111b21]">
           {renderText(text)}
         </p>
-        <div className="mt-[3px] flex items-center justify-end gap-[3px]">
+        <div className="mt-[3px] flex items-end justify-end gap-[3px]">
           <span className="text-[11px] leading-none text-[#667781]">{fmtTime(ts)}</span>
-          {/* Blue double-tick read receipt */}
-          <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
-            <path d="M11.071.653a.75.75 0 0 1 .053 1.06l-6.5 7a.75.75 0 0 1-1.112 0l-3-3.25a.75.75 0 0 1 1.112-1.028L4.5 7.066l5.956-6.36a.75.75 0 0 1 1.06-.053z" fill="#53bdeb"/>
-            <path d="M14.571.653a.75.75 0 0 1 .053 1.06l-6.5 7a.75.75 0 0 1-1.059.022L8.5 7.066l.959-1.031.806.868 5.246-5.197a.75.75 0 0 1 1.06-.053z" fill="#53bdeb"/>
+          {/*
+           * Stroke-based double-tick. The original fill-path version had a closing
+           * arc that reached x ≈ 16.57, past the viewBox right edge (16), causing
+           * the second tick's tip to be clipped. These stroke paths are analytically
+           * verified to stay within the 0–16 × 0–11 viewBox (including stroke width).
+           */}
+          <svg
+            width="16"
+            height="11"
+            viewBox="0 0 16 11"
+            fill="none"
+            className="block shrink-0"
+            aria-hidden="true"
+          >
+            {/* left checkmark  — rightmost stroke edge ≈ 9.6, bottom ≈ 9.1 */}
+            <path
+              d="M1.5 5.5 L4 8.5 L9.5 1"
+              stroke="#53bdeb"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {/* right checkmark — rightmost stroke edge ≈ 15.1, bottom ≈ 9.1 */}
+            <path
+              d="M5 5.5 L7.5 8.5 L14.5 1"
+              stroke="#53bdeb"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
       </div>
