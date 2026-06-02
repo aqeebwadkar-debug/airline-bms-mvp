@@ -233,21 +233,66 @@ export default function PassengerChatbotPage() {
   const sessionRef          = useRef(0);
   const bottomRef           = useRef<HTMLDivElement>(null);
   const textareaRef         = useRef<HTMLTextAreaElement>(null);
+  const containerRef        = useRef<HTMLDivElement>(null);
+  const scrollAreaRef       = useRef<HTMLDivElement>(null);
 
-  // Lock body scroll so only the message area scrolls
+  // Prevent body/html from scrolling behind the chat (iOS + Android)
   useEffect(() => {
-    const prevBody = document.body.style.overflow;
-    const prevHtml = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
+    const b = document.body;
+    const h = document.documentElement;
+    const prev = [b.style.overflow, h.style.overflow, b.style.position, b.style.width];
+    b.style.overflow = "hidden";
+    h.style.overflow = "hidden";
+    // position:fixed on body stops iOS Safari rubber-band scroll leaking through
+    b.style.position = "fixed";
+    b.style.width = "100%";
     return () => {
-      document.body.style.overflow = prevBody;
-      document.documentElement.style.overflow = prevHtml;
+      [b.style.overflow, h.style.overflow, b.style.position, b.style.width] = prev;
     };
   }, []);
 
+  // visualViewport handler — the only reliable cross-browser fix for:
+  //  • Android Chrome: viewport shrinks when keyboard opens
+  //  • iOS Safari: keyboard overlays layout viewport (offsetTop becomes non-zero)
+  //  • Samsung Internet: similar to Android Chrome
+  // We drive the container height from visualViewport.height so the chat always
+  // fills exactly the visible area above the keyboard, then instantly jump to
+  // the latest message so the user never loses context while typing.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = containerRef.current;
+    const scroller  = scrollAreaRef.current;
+    if (!container) return;
+
+    function sync() {
+      const vv = window.visualViewport;
+      const h  = vv ? vv.height    : window.innerHeight;
+      const y  = vv ? vv.offsetTop : 0;
+      container!.style.height = `${h}px`;
+      container!.style.top    = `${y}px`;
+      // Instantly pin to bottom so latest messages stay visible when keyboard opens
+      if (scroller) scroller.scrollTop = scroller.scrollHeight;
+    }
+
+    sync(); // apply on mount
+
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", sync);
+    vv?.addEventListener("scroll", sync);
+    // Fallback for browsers that lack visualViewport (very old Android WebView)
+    window.addEventListener("resize", sync);
+
+    return () => {
+      vv?.removeEventListener("resize", sync);
+      vv?.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, []);
+
+  // Smooth scroll to bottom when new messages arrive or typing indicator changes
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [msgs, typing]);
 
   function push(msg: Msg) {
@@ -411,15 +456,20 @@ export default function PassengerChatbotPage() {
   const hasInput = input.trim().length > 0;
 
   return (
-    /*
-     * position: fixed; inset: 0 is the most reliable cross-platform approach.
-     * On Android Chrome, when the keyboard opens the viewport shrinks — fixed
-     * elements automatically adapt, keeping the input above the keyboard and
-     * preventing the black-gap / layout-jump issues caused by 100vh.
-     */
     <div
+      ref={containerRef}
       className="flex flex-col"
-      style={{ position: "fixed", inset: 0, background: "#efeae2", overflow: "hidden" }}
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0,
+        // `height` is set to 100dvh as a CSS baseline; the visualViewport effect
+        // immediately overrides this with the real visible-area height in JS.
+        // Using explicit top/left/right instead of `inset` avoids the `bottom:0`
+        // anchor that fights iOS Safari when the keyboard slides up.
+        height: "100dvh",
+        background: "#efeae2",
+        overflow: "hidden",
+      }}
     >
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div
@@ -456,9 +506,15 @@ export default function PassengerChatbotPage() {
 
       {/* ── Message area ─────────────────────────────────────────────────── */}
       <div
-        className="flex-1 overflow-y-auto overscroll-contain py-2"
+        ref={scrollAreaRef}
+        className="flex-1 overflow-y-auto py-2"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23b0a99f' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          // contain: prevents rubber-band from bubbling to body (iOS + Android)
+          overscrollBehavior: "contain",
+          // pan-y: lets the browser know this element scrolls vertically,
+          // enabling native touch momentum without waiting for JS
+          touchAction: "pan-y",
         }}
       >
         <DatePill label="Today" />
